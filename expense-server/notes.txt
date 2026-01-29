@@ -1,0 +1,13 @@
+package.json
+its is a meta data 
+like entering hostel seeing this is mess warden office 
+when node stars first it looks for package.json
+
+express install krke package-lock.json download hota  and package.json
+
+
+    MONGODB
+ no SQL 
+ stores data in JSON BSON(binary data stores in tree format)
+ 
+ 
