@@ -1,8 +1,8 @@
 
-import { ADMIN_ROLE,  MANAGER_ROLE, VIEWER_ROLE } from "./userRoles";
+const { ADMIN_ROLE,  MANAGER_ROLE, VIEWER_ROLE } = require("./userRoles");
 
 const permissions = {
-        ADMIN_ROLE: [
+        [ADMIN_ROLE]: [
             'user:create',
             'user:update',
             'user:delete',
@@ -14,7 +14,7 @@ const permissions = {
             'payment:create'
 
         ],
-        MANAGER_ROLE: [
+        [MANAGER_ROLE]: [
             'user:view',
             'group:create',
             'group:update',
@@ -22,7 +22,7 @@ const permissions = {
 
         ],
 
-        VIEWER_ROLE: [
+        [VIEWER_ROLE]: [
             'user:view',
             'group:view'
 

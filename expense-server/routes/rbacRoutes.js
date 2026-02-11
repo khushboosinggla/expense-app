@@ -1,7 +1,7 @@
 const express = require('express');
 const rbacController = require('../controllers/rbacController');
-const authMIddleware = require('../middleware/authMiddleware');
-const authorizeMiddleware = require('../middlewares/authorizemiddleware');
+const authMiddleware = require('../middlewares/authMiddleware');
+const authorizeMiddleware = require('../middlewares/authorizeMiddleware');
 
 const router = express.Router();
 

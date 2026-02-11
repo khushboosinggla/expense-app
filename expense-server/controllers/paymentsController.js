@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const {CREDIT_TO_PAISA_MAPPING } = require('../constants/paymentConstants');
 const users = require('../model/users');
+const { request } = require('http');
 
 const razorpayClient = new Razorpay({
     key_id: process.env.RAZORPAY_key_id,
@@ -68,6 +69,150 @@ const paymentsController = {
         } catch (error) {
             return response.status(500).json({message: 'Internal server error'});
         }
+    },
+
+    createSubscription: async (request, response) => {
+        try {
+            const { plan_name } = request.body;
+
+             if (!PLAN_IDS[plan_name]) {
+                return response.status(400).json({
+                    message: 'Invalid plan selected'
+                });
+             }
+
+             const plan = PLAN_IDS[plan_name];
+             const subscription = await razorpayClient.subscriptions.create({
+                plan_id: plan.id,
+                customer_notify: 1,
+                total_count: plan.totalBillingCycleCount,
+                notes: {
+                    userId: request.user._id
+                }
+             });
+
+             return response.json({subscription: subscription});
+
+        } catch (error) {
+            console.log(error);
+            return response.status(500).json({ message: 'Internal server error'});
+        }
+
+    },
+
+    captureSubscription: async (request,response) => {
+        try {
+            const {subscriptionId} = request.body;
+
+            const subscription = await razorpayClient.subscriptions.fetch(subscriptionId);
+            const user = await Users.findById({ _id: request.user._id });
+
+            user.subscription = {
+                subscriptionId: subscriptionId,
+                planId: subscription.plan_id,
+                status: subscription.status
+            };
+            await user.save();
+            response.json({ user: user });
+        } catch (error) {
+            console.log(error);
+            return response.status(500).json({ message: 'Internal server error'});
+        }
+    },
+
+        
+
+    handleWebhookEvents: async (request,response) => {
+        try {
+            console.log('Recieved Event');
+            const signature = request.headers['x-razorpay-signature'];
+            const body = request.body;
+            const  expectedSignature = crypto
+                .createHmac('sha256', process.env.RAZORPAY_key_SECRET)
+                .update(body)
+                .digest('hex');
+
+                if(expectedSignature !== signature){
+                    return response.status(400).send('Invalid signature');
+                 }
+                const payload = JSON.parse(body);
+                console.log(JSON.stringify(payload, null, 2));
+
+                const event = payload.event;
+                const subscriptionData= payload.payload.subscription.entry;
+                const razorpaySubscriptionId = subscriptionData.id;
+                const userId = subscriptionData.notes?.userId;
+                 
+                 if (!userId) {
+                    console.log('User ID not found in the notes')
+                    return response.status(400).send('User ID not found in subscription notes');
+                }
+
+                let newStatus; 
+                switch (event) {
+                    case 'subscription.activated':
+                        newStatus = 'active';
+                        break;
+
+                    case 'subscription.pending':
+                        newStatus = 'pending';
+                        break;
+                    
+                    case 'subscription.cancelled':
+                        newStatus = 'cancelled';
+                        break;
+
+                    case 'subscription.completed':
+                        newStatus = 'completed';
+                        break;
+
+                    default:
+                        console.log(`Unhandled event type: ${event}`);
+                        return response.status(200).send(`Unhandled event received: ${event}`);
+                }
+
+                const user = await User.findByIdAndUpdate(
+                    {_id: userId},
+                    {
+                        $set: {
+                            'subscription.subscriptionId': razorpaySubscriptionId,
+                            'subscription.status': newStatus,
+                            'subscription.planId': subscriptionData.plan_id,
+                            'subscription.razorpayStatus': subscriptionData.start_at
+                                ? new Date(subscriptionData.start_at * 1000)
+                                : null,
+                                'subscription.end': subscriptionData.end_at
+                                    ? new Date(subscriptionData.start_at * 1000)
+                                    : null,
+                                'subscription.lastBillDate': subscriptionData.current_at
+                                    ? new Date(subscriptionData.current_start * 1000)
+                                    : null,
+                                'subscription.nextBillDate': subscriptionData.current_end
+                                    ? new Date(subscriptionData.current_end * 1000)
+                                    : null,
+                                'subscription.paymentsMade': subscriptionData.paid_count,
+                                'subscription.paymentsRemaining':
+                                subscriptionData.remaining_count,
+                            }
+                        },
+                        {new: true}
+                    );
+
+                    if (!user) {
+                        console.log('No user with provided userID exist');
+                        return response.status(400).send('No user with provided userID exist');
+
+                    }
+
+                    console.log('Updated Subscription status for the user ${user.email} to ${newStatus}');
+                    return response.status(200).send(`Event processed for user: ${user.email} with userID: ${userId}`);
+
+        } catch (error) {
+            console.log(error);
+            return response.status(500).json({ message: 'Internal server error'});
+        }
+
+
     },
 };
 

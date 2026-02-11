@@ -1,4 +1,4 @@
-const permission = require('../utility/permissions');
+const permission = require('../utility/permission');
 
 const authorize = (requiredPermission) => {
     return (request, response, next) => {
