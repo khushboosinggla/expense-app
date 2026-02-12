@@ -1,32 +1,33 @@
-
 const jwt = require('jsonwebtoken');
+
 const authMiddleware = {
     protect: async (request, response, next) => {
-        try{
+        try {
             const token = request.cookies?.jwtToken;
 
-            if(!token){
+            if (!token) {
                 return response.status(401).json({
-                    error: 'Unauthorized Access'
+                    error: 'Unauthorized access'
                 });
             }
-            
-            try{
+
+            try {
                 const user = jwt.verify(token, process.env.JWT_SECRET);
                 request.user = user;
                 next();
-            }catch(error){
+            } catch (error) {
                 return response.status(401).json({
-                    error: 'Unauthorized Access '
+                    error: 'Unauthorized access'
                 });
             }
 
-        }catch(error){
+        } catch (error) {
             console.log(error);
             response.status(500).json({
                 message: 'Internal server error'
             });
         }
-    }
+    },
 };
+
 module.exports = authMiddleware;
